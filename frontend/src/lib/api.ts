@@ -1,77 +1,142 @@
-import axios from 'axios';
-import { useAuthStore } from '../store/authStore';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-const api = axios.create({
-  baseURL: '/api',
-  timeout: 30000,
-});
+async function fetchAPI(endpoint: string, options: RequestInit = {}) {
+  const token = localStorage.getItem('token');
+  
+  const config: RequestInit = {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    },
+  };
 
-api.interceptors.request.use(
-  (config) => {
-    const token = useAuthStore.getState().token;
-    if (token) {
-      config.headers.Authorization = 'Bearer ' + token;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
+  const response = await fetch(`${API_URL}${endpoint}`, config);
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    throw new Error(error.message || 'Request failed');
   }
-);
+  
+  return response.json();
+}
 
-export default api;
+export const api = {
+  // Auth
+  login: (email: string, password: string) =>
+    fetchAPI('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+    
+  register: (email: string, password: string, name: string) =>
+    fetchAPI('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, name }),
+    }),
 
-export const authApi = {
-  login: (email: string, password: string) => 
-    api.post('/auth/login', { email, password }),
-  register: (email: string, password: string, name?: string) => 
-    api.post('/auth/register', { email, password, name }),
-  me: () => api.get('/auth/me'),
-};
+  getProfile: () => fetchAPI('/api/auth/profile'),
+  
+  updateProfile: (data: { name?: string; password?: string }) =>
+    fetchAPI('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 
-export const accountsApi = {
-  list: () => api.get('/accounts'),
-  get: (id: string) => api.get('/accounts/' + id),
-  create: (data: { email: string; profileUrl?: string; profileName?: string }) => 
-    api.post('/accounts', data),
-  update: (id: string, data: any) => api.put('/accounts/' + id, data),
-  delete: (id: string) => api.delete('/accounts/' + id),
-};
+  // Accounts
+  getAccounts: () => fetchAPI('/api/accounts'),
+  
+  getAccount: (id: string) => fetchAPI(`/api/accounts/${id}`),
+  
+  createAccount: (data: { linkedinEmail: string; linkedinPassword: string; name?: string }) =>
+    fetchAPI('/api/accounts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    
+  updateAccount: (id: string, data: { name?: string; isActive?: boolean }) =>
+    fetchAPI(`/api/accounts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+    
+  deleteAccount: (id: string) =>
+    fetchAPI(`/api/accounts/${id}`, { method: 'DELETE' }),
 
-export const campaignsApi = {
-  list: (params?: { status?: string; type?: string }) => 
-    api.get('/campaigns', { params }),
-  get: (id: string) => api.get('/campaigns/' + id),
-  create: (data: { name: string; type: string; accountId: string; settings?: any }) => 
-    api.post('/campaigns', data),
-  update: (id: string, data: any) => api.put('/campaigns/' + id, data),
-  toggle: (id: string) => api.patch('/campaigns/' + id + '/toggle'),
-  delete: (id: string) => api.delete('/campaigns/' + id),
-};
+  // Campaigns
+  getCampaigns: (accountId?: string) =>
+    fetchAPI(`/api/campaigns${accountId ? `?accountId=${accountId}` : ''}`),
+    
+  getCampaign: (id: string) => fetchAPI(`/api/campaigns/${id}`),
+  
+  createCampaign: (data: {
+    name: string;
+    type: string;
+    accountId: string;
+    settings?: object;
+    scheduledAt?: string;
+  }) =>
+    fetchAPI('/api/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    
+  updateCampaign: (id: string, data: { name?: string; status?: string; settings?: object }) =>
+    fetchAPI(`/api/campaigns/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+    
+  deleteCampaign: (id: string) =>
+    fetchAPI(`/api/campaigns/${id}`, { method: 'DELETE' }),
 
-export const leadsApi = {
-  list: (params?: { search?: string; status?: string; page?: number; limit?: number }) => 
-    api.get('/leads', { params }),
-  get: (id: string) => api.get('/leads/' + id),
-  create: (data: any) => api.post('/leads', data),
-  update: (id: string, data: any) => api.put('/leads/' + id, data),
-  connect: (id: string, message?: string) => api.post('/leads/' + id + '/connect', { message }),
-  message: (id: string, message: string) => api.post('/leads/' + id + '/message', { message }),
-  delete: (id: string) => api.delete('/leads/' + id),
-};
+  // Leads
+  getLeads: (params?: { accountId?: string; status?: string; tags?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.accountId) searchParams.append('accountId', params.accountId);
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.tags) searchParams.append('tags', params.tags);
+    const query = searchParams.toString();
+    return fetchAPI(`/api/leads${query ? `?${query}` : ''}`);
+  },
+  
+  getLead: (id: string) => fetchAPI(`/api/leads/${id}`),
+  
+  createLead: (data: {
+    linkedinUrl: string;
+    accountId: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    company?: string;
+    title?: string;
+    tags?: string[];
+  }) =>
+    fetchAPI('/api/leads', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    
+  updateLead: (id: string, data: { status?: string; notes?: string; tags?: string[] }) =>
+    fetchAPI(`/api/leads/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+    
+  deleteLead: (id: string) =>
+    fetchAPI(`/api/leads/${id}`, { method: 'DELETE' }),
 
-export const aiApi = {
-  generate: (prompt: string, type: 'post' | 'comment' | 'message') => 
-    api.post('/ai/generate', { prompt, type }),
-  ideas: (topic: string, count?: number) => 
-    api.post('/ai/ideas', { topic, count }),
+  // AI
+  generateContent: (data: { prompt: string; type: string; provider?: string }) =>
+    fetchAPI('/api/ai/generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    
+  improveContent: (data: { content: string; instruction: string; provider?: string }) =>
+    fetchAPI('/api/ai/improve', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
