@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token');
@@ -22,9 +22,8 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   return response.json();
 }
 
-// Main API object
-export const api = {
-  // Auth
+// Auth API
+export const authApi = {
   login: (email: string, password: string) =>
     fetchAPI('/api/auth/login', {
       method: 'POST',
@@ -44,34 +43,38 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+};
 
-  // Accounts
-  getAccounts: () => fetchAPI('/api/accounts'),
+// Accounts API
+export const accountsApi = {
+  list: () => fetchAPI('/api/accounts'),
   
-  getAccount: (id: string) => fetchAPI(`/api/accounts/${id}`),
+  get: (id: string) => fetchAPI(`/api/accounts/${id}`),
   
-  createAccount: (data: { linkedinEmail: string; linkedinPassword: string; name?: string }) =>
+  create: (data: { linkedinEmail: string; linkedinPassword: string; name?: string }) =>
     fetchAPI('/api/accounts', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
     
-  updateAccount: (id: string, data: { name?: string; isActive?: boolean }) =>
+  update: (id: string, data: { name?: string; isActive?: boolean }) =>
     fetchAPI(`/api/accounts/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
     
-  deleteAccount: (id: string) =>
+  delete: (id: string) =>
     fetchAPI(`/api/accounts/${id}`, { method: 'DELETE' }),
+};
 
-  // Campaigns
-  getCampaigns: (accountId?: string) =>
+// Campaigns API
+export const campaignsApi = {
+  list: (accountId?: string) =>
     fetchAPI(`/api/campaigns${accountId ? `?accountId=${accountId}` : ''}`),
     
-  getCampaign: (id: string) => fetchAPI(`/api/campaigns/${id}`),
+  get: (id: string) => fetchAPI(`/api/campaigns/${id}`),
   
-  createCampaign: (data: {
+  create: (data: {
     name: string;
     type: string;
     accountId: string;
@@ -83,17 +86,25 @@ export const api = {
       body: JSON.stringify(data),
     }),
     
-  updateCampaign: (id: string, data: { name?: string; status?: string; settings?: object }) =>
+  update: (id: string, data: { name?: string; status?: string; settings?: object }) =>
     fetchAPI(`/api/campaigns/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  
+  toggle: (id: string, status: string) =>
+    fetchAPI(`/api/campaigns/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
     
-  deleteCampaign: (id: string) =>
+  delete: (id: string) =>
     fetchAPI(`/api/campaigns/${id}`, { method: 'DELETE' }),
+};
 
-  // Leads
-  getLeads: (params?: { accountId?: string; status?: string; tags?: string }) => {
+// Leads API
+export const leadsApi = {
+  list: (params?: { accountId?: string; status?: string; tags?: string }) => {
     const searchParams = new URLSearchParams();
     if (params?.accountId) searchParams.append('accountId', params.accountId);
     if (params?.status) searchParams.append('status', params.status);
@@ -102,9 +113,9 @@ export const api = {
     return fetchAPI(`/api/leads${query ? `?${query}` : ''}`);
   },
   
-  getLead: (id: string) => fetchAPI(`/api/leads/${id}`),
+  get: (id: string) => fetchAPI(`/api/leads/${id}`),
   
-  createLead: (data: {
+  create: (data: {
     linkedinUrl: string;
     accountId: string;
     firstName?: string;
@@ -119,62 +130,45 @@ export const api = {
       body: JSON.stringify(data),
     }),
     
-  updateLead: (id: string, data: { status?: string; notes?: string; tags?: string[] }) =>
+  update: (id: string, data: { status?: string; notes?: string; tags?: string[] }) =>
     fetchAPI(`/api/leads/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
     
-  deleteLead: (id: string) =>
+  delete: (id: string) =>
     fetchAPI(`/api/leads/${id}`, { method: 'DELETE' }),
+  
+  connect: (id: string) =>
+    fetchAPI(`/api/leads/${id}/connect`, { method: 'POST' }),
+};
 
-  // AI
-  generateContent: (data: { prompt: string; type: string; provider?: string }) =>
+// AI API
+export const aiApi = {
+  generate: (data: { prompt: string; type: string; provider?: string }) =>
     fetchAPI('/api/ai/generate', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
     
-  improveContent: (data: { content: string; instruction: string; provider?: string }) =>
+  improve: (data: { content: string; instruction: string; provider?: string }) =>
     fetchAPI('/api/ai/improve', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  ideas: (data: { topic: string; count?: number; provider?: string }) =>
+    fetchAPI('/api/ai/ideas', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 };
 
-// Named exports for backward compatibility
-export const authApi = {
-  login: api.login,
-  register: api.register,
-  getProfile: api.getProfile,
-  updateProfile: api.updateProfile,
-};
-
-export const accountsApi = {
-  getAccounts: api.getAccounts,
-  getAccount: api.getAccount,
-  createAccount: api.createAccount,
-  updateAccount: api.updateAccount,
-  deleteAccount: api.deleteAccount,
-};
-
-export const campaignsApi = {
-  getCampaigns: api.getCampaigns,
-  getCampaign: api.getCampaign,
-  createCampaign: api.createCampaign,
-  updateCampaign: api.updateCampaign,
-  deleteCampaign: api.deleteCampaign,
-};
-
-export const leadsApi = {
-  getLeads: api.getLeads,
-  getLead: api.getLead,
-  createLead: api.createLead,
-  updateLead: api.updateLead,
-  deleteLead: api.deleteLead,
-};
-
-export const aiApi = {
-  generateContent: api.generateContent,
-  improveContent: api.improveContent,
+// Default export for backward compatibility
+export const api = {
+  auth: authApi,
+  accounts: accountsApi,
+  campaigns: campaignsApi,
+  leads: leadsApi,
+  ai: aiApi,
 };
