@@ -3,7 +3,6 @@ import cors from 'cors';
 import { config } from './config';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
-import { rateLimit } from './middleware/rateLimit';
 import authRoutes from './routes/auth';
 import accountRoutes from './routes/accounts';
 import campaignRoutes from './routes/campaigns';
@@ -12,36 +11,77 @@ import aiRoutes from './routes/ai';
 
 const app = express();
 
-app.use(cors({ 
-  origin: config.FRONTEND_URL, 
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+// Middleware
+app.use(cors({
+  origin: config.frontendUrl || '*',
+  credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
-app.use(rateLimit(100, 60000));
+app.use(express.urlencoded({ extended: true }));
 
+// Request logging
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.path}`, { 
+    ip: req.ip,
+    userAgent: req.get('User-Agent')
+  });
+  next();
+});
+
+// Root route
+app.get('/', (_, res) => {
+  res.json({ 
+    name: 'LinkedIn Manager API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth',
+      accounts: '/api/accounts',
+      campaigns: '/api/campaigns',
+      leads: '/api/leads',
+      ai: '/api/ai'
+    }
+  });
+});
+
+// Health check
+app.get('/health', (_, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0' });
+});
+
+// API Health check (with /api prefix)
+app.get('/api/health', (_, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0' });
+});
+
+// API Routes - all under /api prefix
 app.use('/api/auth', authRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/ai', aiRoutes);
 
-app.get('/health', (_, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
+// Error handling
+app.use(errorHandler);
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ 
+    error: 'Not Found',
+    message: `Route ${req.method} ${req.path} not found`,
+    availableEndpoints: ['/api/health', '/api/auth', '/api/accounts', '/api/campaigns', '/api/leads', '/api/ai']
   });
 });
 
-app.use(errorHandler);
+const PORT = process.env.PORT || 3001;
 
-const PORT = parseInt(config.PORT, 10);
-app.listen(PORT, '0.0.0.0', () => {
-  logger.info('Server running on port ' + PORT);
-  logger.info('Health check: http://localhost:' + PORT + '/health');
+app.listen(PORT, () => {
+  logger.info(`Server running on port ${PORT}`);
+  logger.info(`Health check: http://localhost:${PORT}/health`);
 });
 
+// Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
   process.exit(0);
