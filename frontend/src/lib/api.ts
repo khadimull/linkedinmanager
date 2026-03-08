@@ -22,6 +22,7 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   return response.json();
 }
 
+// Main API object
 export const api = {
   // Auth
   login: (email: string, password: string) =>
@@ -139,4 +140,41 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+};
+
+// Named exports for backward compatibility
+export const authApi = {
+  login: api.login,
+  register: api.register,
+  getProfile: api.getProfile,
+  updateProfile: api.updateProfile,
+};
+
+export const accountsApi = {
+  getAccounts: api.getAccounts,
+  getAccount: api.getAccount,
+  createAccount: api.createAccount,
+  updateAccount: api.updateAccount,
+  deleteAccount: api.deleteAccount,
+};
+
+export const campaignsApi = {
+  getCampaigns: api.getCampaigns,
+  getCampaign: api.getCampaign,
+  createCampaign: api.createCampaign,
+  updateCampaign: api.updateCampaign,
+  deleteCampaign: api.deleteCampaign,
+};
+
+export const leadsApi = {
+  getLeads: api.getLeads,
+  getLead: api.getLead,
+  createLead: api.createLead,
+  updateLead: api.updateLead,
+  deleteLead: api.deleteLead,
+};
+
+export const aiApi = {
+  generateContent: api.generateContent,
+  improveContent: api.improveContent,
 };
